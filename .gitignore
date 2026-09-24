@@ -1,0 +1,13 @@
+*.out
+*.o
+test.cpp
+
+crypto/cipher/*
+crypto/host_key/*
+crypto/kex/*
+crypto/mac/*
+
+!cipher.h
+!host_key.h
+!kex.h
+!mac.h
