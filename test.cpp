@@ -11,20 +11,9 @@
 #include "logger.h"
 
 int main() {
-    minissh::transport_layer transport{"localhost", "22"};
+    minissh::transport_layer transport{"localhost", "4000", "MINISSH-1.0-client"};
     transport.init_kex();
 
-    struct service_request {
-        uint8_t message_number;
-        std::string service_name;
-    } request{
-        5,
-        "ssh-userauth"
-    };
-
-    transport.send_packet(minissh::packet{request});
-    service_request responce = transport.recv_packet().to_struct<service_request>();
-
-    LOG_DEBUG(std::format("responce : {}", minissh::string_repr(responce)));
+    LOG_DEBUG("main exit");
     return 0;
 }

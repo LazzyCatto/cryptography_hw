@@ -15,16 +15,10 @@ namespace minissh {
         minissh::namelist encryption_algorithms_server_to_client;
         minissh::namelist mac_algorithms_client_to_server;
         minissh::namelist mac_algorithms_server_to_client;
-        minissh::namelist compression_algorithms_client_to_server;
-        minissh::namelist compression_algorithms_server_to_client;
-        minissh::namelist languages_client_to_server;
-        minissh::namelist languages_server_to_client;
-        bool first_kex_packet_follows;
-        uint32_t extentions;
     };
 
     struct newkeys {
-        uint8_t message_number = SSH_MSG_NEWKEYS;
+        uint8_t message_number = MINISSH_NEWKEYS;
     };
 
     class transport_layer {
@@ -36,28 +30,25 @@ namespace minissh {
             _send_counter{0},
             _first_kex{true}
         {
-            if (!_init()) {
-                LOG_ERROR("could not initialize transport layer.");
-                throw std::runtime_error("could not initialize transport layer.");
-            }
+            _init();
         }
         transport_layer(const char* host, const char* port) : transport_layer(host, port, "SSH-2.0-minissh_1.0\r\n") {}
         transport_layer(const char* host) : transport_layer(host, "22") {}
         transport_layer() : transport_layer("localhost") {}
 
-        bool init_kex();
+        void send(packet&&);
+        packet recv();
 
-        packet recv_packet();
-        void send_packet(packet&&);
+        void init_kex();
 
         uint32_t recv_counter() const { return _recv_counter; }
         uint32_t send_counter() const { return _send_counter; }
 
       private:
-        client_socket _socket;
-
         std::string _client_protocol_name;
         std::string _server_protocol_name;
+
+        client_socket _socket;
 
         uint32_t _recv_counter;
         uint32_t _send_counter;
@@ -83,13 +74,13 @@ namespace minissh {
             secure_buffer integrity_key_server_to_client;
         } _keys;
 
-        bool _init();
+        void _init();
 
         void _init_keys();
         void _init_algos();
 
-        bool _prepare_kex(algorythms*);
-        bool _prepare_protolcol_list(keyinit*) const;
+        void _prepare_kex(algorythms*);
+        void _prepare_protolcol_list(keyinit*) const;
 
         bool _select_kex(const keyinit& client, const keyinit& server, std::unique_ptr<kex>*) const;
         bool _select_host_key(const keyinit& client, const keyinit& server, std::unique_ptr<host_key>*) const;
@@ -99,6 +90,8 @@ namespace minissh {
         bool _select_mac_client(const keyinit& client, const keyinit& server, std::unique_ptr<mac>*) const;
 
         secure_buffer _get_key(const mpint&, const secure_buffer&, char, const secure_buffer&, uint32_t);
+
+        std::string _try_read_string_from_buffer(const uint8_t*, uint32_t) const;
     };
 }
 

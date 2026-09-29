@@ -1,52 +1,73 @@
-#include "transport.h"
+#include "minissh/transport.h"
 
 #include "crypto/hash.h"
 #include "crypto/rand.h"
+#include "minissh/numbers.h"
+#include "logger.h"
 
 namespace minissh {
-    bool transport_layer::init_kex() {
+    void transport_layer::init_kex() {
         LOG_INFO("start KEX init");
         algorythms selected_algos;
-        if (!_prepare_kex(&selected_algos)) {
-            LOG_WARN("failed to prepare kex");
-            return false;
+        _prepare_kex(&selected_algos);
+
+        if (!selected_algos.kex_algorithms) {
+            LOG_WARN("no KEX algrythm is used");
+            return;
         }
         
-        LOG_DEBUG("starting kex loop");
+        LOG_DEBUG("starting KEX loop");
         while (!selected_algos.kex_algorithms->is_done()) {
-            packet server_kex_packet = recv_packet();
+            packet server_kex_packet = recv();
+            uint8_t msg_num = server_kex_packet.message_number();
+            if (msg_num < 30 || msg_num >= 50) {
+                throw std::runtime_error("invalid message number for kex");
+            }
             selected_algos.kex_algorithms->on_message(server_kex_packet);
         }
 
-        {
-            std::string key_algorythm_name;
-            std::string signature_algorythm_name;
+        if (!selected_algos.server_host_key_algorithms) {
+            LOG_WARN("no HOST KEY algrythm is used");
+        } else {
+            {
+                std::string key_algorythm_name = _try_read_string_from_buffer(
+                    selected_algos.kex_algorithms->host_key_blob().data(),
+                    selected_algos.kex_algorithms->host_key_blob().length()
+                );
+                std::string signature_algorythm_name = _try_read_string_from_buffer(
+                    selected_algos.kex_algorithms->signature_blob().data(),
+                    selected_algos.kex_algorithms->signature_blob().length()
+                );
 
-            _read_from_buffer_no_offset(selected_algos.kex_algorithms->host_key_blob().data(), &key_algorythm_name);
-            _read_from_buffer_no_offset(selected_algos.kex_algorithms->signature_blob().data(), &signature_algorythm_name);
+                LOG_DEBUG(std::format("recieved \"{}\" as key algorythm", key_algorythm_name));
+                LOG_DEBUG(std::format("recieved \"{}\" as signature algorythm", signature_algorythm_name));
 
-            LOG_INFO(std::format("recieved \"{}\" as key algorythm", key_algorythm_name));
-            LOG_INFO(std::format("recieved \"{}\" as signature algorythm", signature_algorythm_name));
-        }
+                if (key_algorythm_name != selected_algos.server_host_key_algorithms->key_name()) {
+                    throw std::runtime_error{"invalid key algorythm is used"};
+                }
 
-        LOG_INFO("checking signature...");
-        bool verified = selected_algos.server_host_key_algorithms->verify(
-            selected_algos.kex_algorithms->exchange_hash(),
-            selected_algos.kex_algorithms->host_key_blob(),
-            selected_algos.kex_algorithms->signature_blob()
-        );
-        if (!verified) {
-            LOG_WARN("signature is not verified!");
-            return false;
+                if (signature_algorythm_name != selected_algos.server_host_key_algorithms->name()) {
+                    throw std::runtime_error{"invalid signature algorythm is used"};
+                }
+            }
+
+            LOG_INFO("checking signature...");
+            bool verified = selected_algos.server_host_key_algorithms->verify(
+                selected_algos.kex_algorithms->exchange_hash(),
+                selected_algos.kex_algorithms->host_key_blob(),
+                selected_algos.kex_algorithms->signature_blob()
+            );
+            if (!verified) {
+                throw std::runtime_error{"signature is not verified!"};
+            }
         }
 
         LOG_INFO("KEX done");
-        send_packet(packet{newkeys{}});
-        packet new_keys_packet = recv_packet();
+        send(packet{newkeys{}});
+        packet new_keys_packet = recv();
 
-        if (new_keys_packet.message_number() != SSH_MSG_NEWKEYS) {
-            LOG_WARN("failed to use new keys");
-            return false;
+        if (new_keys_packet.message_number() != MINISSH_NEWKEYS) {
+            throw std::runtime_error{"failed to use new keys"};
         }
 
         LOG_DEBUG("setting up new keys...");
@@ -60,12 +81,10 @@ namespace minissh {
 
         _init_keys();
         _init_algos();
-
-        return true;
     }
 
-    packet transport_layer::recv_packet() {
-        LOG_DEBUG(std::format("recieving packet {}", _recv_counter));
+    packet transport_layer::recv() {
+        LOG_DEBUG(std::format("recieving packet id={}", _recv_counter));
         bool use_mac = bool(_selected_algos.mac_algorithms_server_to_client);
         bool use_enc = bool(_selected_algos.encryption_algorithms_server_to_client);
 
@@ -78,19 +97,59 @@ namespace minissh {
 
             uint32_t packet_length = _selected_algos.encryption_algorithms_server_to_client->decript_length(size_bytes);
 
+            if (packet_length > 1000) {
+                throw std::runtime_error("message too long, probably the encryption problem");
+            }
+            if ((packet_length + 4) % _selected_algos.encryption_algorithms_server_to_client->block_length() != 0) {
+                throw std::runtime_error("message size is not multiple of block length");
+            }
+
             secure_buffer encripted_data{packet_length + 4};
             memcpy(encripted_data.data(), size_bytes, 4);
 
             _socket.recv_bytes(encripted_data.data() + 4, packet_length);
 
             _selected_algos.encryption_algorithms_server_to_client->decript(encripted_data);
-            uint8_t padding = encripted_data[4];
+            uint8_t padding_length = encripted_data[4];
+
+            if (padding_length < 4) {
+                throw std::runtime_error("padding length must be at least 4");
+            }
+            if (padding_length >= packet_length - 1) {
+                throw std::runtime_error("padding too long, probably the encryption problem");
+            }
         
-            result = packet{packet_length - padding - 1, padding};
+            uint32_t payload_length = packet_length - padding_length - 1;
+            result = packet{payload_length, padding_length};
             memcpy(result.payload().data(), encripted_data.data() + 5, result.payload_length());
-            memcpy(result.padding().data(), encripted_data.data() + packet_length - padding + 4, result.payload_length());
+            memcpy(result.padding().data(), encripted_data.data() + packet_length - padding_length + 4, result.payload_length());
         } else {
-            result = _socket.recv_packet();
+            uint8_t size_bytes[5];
+            _socket.recv_bytes(size_bytes, 5);
+
+            uint32_t packet_length;
+            uint8_t padding_length;
+            uint32_t offset = 0;
+            _read_from_buffer(size_bytes, offset, &packet_length);
+            _read_from_buffer(size_bytes, offset, &padding_length);
+
+            if (packet_length > 1000) {
+                throw std::runtime_error("message too long, probably the littleendian format");
+            }
+            if ((packet_length + 4) % 8 != 0) {
+                throw std::runtime_error("message size is not multiple of 8");
+            }
+            if (padding_length < 4) {
+                throw std::runtime_error("padding length must be at least 4");
+            }
+            if (padding_length >= packet_length - 1) {
+                throw std::runtime_error("padding too long");
+            }
+
+            uint32_t payload_length = packet_length - padding_length - 1;
+            result = packet{payload_length, padding_length};
+            _socket.recv_bytes(result.payload().data(), payload_length);
+            _socket.recv_bytes(result.padding().data(), padding_length);
         }
 
         if (use_mac) {
@@ -101,8 +160,7 @@ namespace minissh {
 
             secure_buffer target_sign = _selected_algos.mac_algorithms_server_to_client->sign(_recv_counter, result.main_packet());
             if (target_sign != mac_sign) {
-                LOG_ERROR("signature is not verified.");
-                throw std::runtime_error("signature is not verified.");
+                throw std::runtime_error("signature is not verified");
             }
         }
 
@@ -110,8 +168,8 @@ namespace minissh {
         return result;
     }
 
-    void transport_layer::send_packet(packet&& to_send) {
-        LOG_DEBUG(std::format("sending packet {}", _send_counter));
+    void transport_layer::send(packet&& to_send) {
+        LOG_DEBUG(std::format("sending packet id={}", _send_counter));
         LOG_DEBUG(std::format("msg_num: {}", static_cast<int>(to_send.message_number())));
 
         bool use_mac = bool(_selected_algos.mac_algorithms_client_to_server);
@@ -147,15 +205,17 @@ namespace minissh {
         ++_send_counter;
     }
 
-    bool transport_layer::_init() {
+    void transport_layer::_init() {
         LOG_INFO("initializing transport layer");
-        _socket.send_string(_client_protocol_name);
+        _socket.send_string(_client_protocol_name + '\n');
         _server_protocol_name = _socket.recv_string();
 
         LOG_INFO(std::format("client_protocol_name : \"{}\"", _client_protocol_name));
         LOG_INFO(std::format("server_protocol_name : \"{}\"", _server_protocol_name));
 
-        return true;
+        if (!_server_protocol_name.starts_with("MINISSH-")) {
+            throw std::runtime_error("invalid first message");
+        }
     }
 
     void transport_layer::_init_keys() {
@@ -235,7 +295,7 @@ namespace minissh {
         }
     }
 
-    bool transport_layer::_prepare_kex(algorythms* selected_algos) {
+    void transport_layer::_prepare_kex(algorythms* selected_algos) {
         LOG_DEBUG("preparing KEX");
 
         keyinit client_init_message{};
@@ -246,59 +306,49 @@ namespace minissh {
 
         packet client_init_packet{client_init_message};
         secure_buffer i_c = client_init_packet.payload();
-        send_packet(std::move(client_init_packet));
+        send(std::move(client_init_packet));
 
         LOG_DEBUG("recieving suitable protocol list");
 
-        packet server_init_package = recv_packet();
+        packet server_init_package = recv();
         secure_buffer i_s = server_init_package.payload();
-        if (server_init_package.message_number() != SSH_MSG_KEXINIT) {
-            LOG_INFO(std::format("invalid message number during kex : {}", static_cast<int>(server_init_package.message_number())));
-            return false;
+        if (server_init_package.message_number() != MINISSH_KEXINIT) {
+            throw std::runtime_error(std::format("invalid message number during kex : {}", static_cast<int>(server_init_package.message_number())));
         }
 
         keyinit server_init_message = server_init_package.to_struct<keyinit>();
         LOG_INFO(std::format("server to client: {}", string_repr(server_init_message)));
 
         if (!_select_kex(client_init_message, server_init_message, &selected_algos->kex_algorithms)) {
-            LOG_INFO("no suitable kex was found");
-            return false;
+            throw std::runtime_error("no suitable kex was found");
         }
         if (!_select_host_key(client_init_message, server_init_message, &selected_algos->server_host_key_algorithms)) {
-            LOG_INFO("no suitable host key was found");
-            return false;
+            throw std::runtime_error("no suitable host key was found");
         }
         if (!_select_cipher_server(client_init_message, server_init_message, &selected_algos->encryption_algorithms_server_to_client)) {
-            LOG_INFO("no suitable cipher was found");
-            return false;
+            throw std::runtime_error("no suitable cipher was found");
         }
         if (!_select_cipher_client(client_init_message, server_init_message, &selected_algos->encryption_algorithms_client_to_server)) {
-            LOG_INFO("no suitable cipher was found");
-            return false;
+            throw std::runtime_error("no suitable cipher was found");
         }
         if (!_select_mac_server(client_init_message, server_init_message, &selected_algos->mac_algorithms_server_to_client)) {
-            LOG_INFO("no suitable mac was found");
-            return false;
+            throw std::runtime_error("no suitable mac was found");
         }
         if (!_select_mac_client(client_init_message, server_init_message, &selected_algos->mac_algorithms_client_to_server)) {
-            LOG_INFO("no suitable mac was found");
-            return false;
+            throw std::runtime_error("no suitable mac was found");
         }
 
-        LOG_DEBUG(std::format("initializiing \"{}\"", selected_algos->kex_algorithms->name()));
         selected_algos->kex_algorithms->init(
             _client_protocol_name,
             _server_protocol_name,
             i_c,
             i_s,
-            [this](packet&& to_send) { this->send_packet(std::move(to_send)); }
+            [this](packet&& to_send) { this->send(std::move(to_send)); }
         );
-
-        return true;
     }
 
-    bool transport_layer::_prepare_protolcol_list(keyinit* result) const {
-        result->message_number = SSH_MSG_KEXINIT;
+    void transport_layer::_prepare_protolcol_list(keyinit* result) const {
+        result->message_number = MINISSH_KEXINIT;
         fill_random(result->cookie.data(), 16);
         result->kex_algorithms = kex_registry().get_value_names();
         result->server_host_key_algorithms = host_key_registry().get_value_names();
@@ -306,20 +356,15 @@ namespace minissh {
         result->encryption_algorithms_server_to_client = server_cipher_registry().get_value_names();
         result->mac_algorithms_client_to_server = client_mac_registry().get_value_names();
         result->mac_algorithms_server_to_client = server_mac_registry().get_value_names();
-        result->compression_algorithms_client_to_server = {"none"};
-        result->compression_algorithms_server_to_client = {"none"};
-        result->languages_client_to_server = {};
-        result->languages_server_to_client = {};
-        result->first_kex_packet_follows = false;
-        result->extentions = 0;
-
-        return true;
     }
 
     bool transport_layer::_select_kex(const keyinit& client, const keyinit& server, std::unique_ptr<kex>* result) const {
         for (const std::string& client_kex_algo : client.kex_algorithms) {
             for (const std::string& server_kex_algo : server.kex_algorithms) {
                 if (client_kex_algo == server_kex_algo) {
+                    if (client_kex_algo == "none") {
+                        *result = nullptr;
+                    }
                     *result = std::move(kex_registry().get_value(client_kex_algo));
                     return true;
                 }
@@ -332,6 +377,9 @@ namespace minissh {
         for (const std::string& client_host_key_algo : client.server_host_key_algorithms) {
             for (const std::string& server_host_key_algo : server.server_host_key_algorithms) {
                 if (client_host_key_algo == server_host_key_algo) {
+                    if (client_host_key_algo == "none") {
+                        *result = nullptr;
+                    }
                     *result = std::move(host_key_registry().get_value(client_host_key_algo));
                     return true;
                 }
@@ -344,6 +392,9 @@ namespace minissh {
         for (const std::string& client_encryption_algo : client.encryption_algorithms_server_to_client) {
             for (const std::string& server_encryption_algo : server.encryption_algorithms_server_to_client) {
                 if (client_encryption_algo == server_encryption_algo) {
+                    if (client_encryption_algo == "none") {
+                        *result = nullptr;
+                    }
                     *result = std::move(server_cipher_registry().get_value(client_encryption_algo));
                     return true;
                 }
@@ -356,6 +407,9 @@ namespace minissh {
         for (const std::string& client_encryption_algo : client.encryption_algorithms_client_to_server) {
             for (const std::string& server_encryption_algo : server.encryption_algorithms_client_to_server) {
                 if (client_encryption_algo == server_encryption_algo) {
+                    if (client_encryption_algo == "none") {
+                        *result = nullptr;
+                    }
                     *result = std::move(client_cipher_registry().get_value(client_encryption_algo));
                     return true;
                 }
@@ -368,6 +422,9 @@ namespace minissh {
         for (const std::string& client_mac_algo : client.mac_algorithms_server_to_client) {
             for (const std::string& server_mac_algo : server.mac_algorithms_server_to_client) {
                 if (client_mac_algo == server_mac_algo) {
+                    if (client_mac_algo == "none") {
+                        *result = nullptr;
+                    }
                     *result = std::move(server_mac_registry().get_value(client_mac_algo));
                     return true;
                 }
@@ -380,6 +437,9 @@ namespace minissh {
         for (const std::string& client_mac_algo : client.mac_algorithms_client_to_server) {
             for (const std::string& server_mac_algo : server.mac_algorithms_client_to_server) {
                 if (client_mac_algo == server_mac_algo) {
+                    if (client_mac_algo == "none") {
+                        *result = nullptr;
+                    }
                     *result = std::move(client_mac_registry().get_value(client_mac_algo));
                     return true;
                 }
@@ -425,5 +485,16 @@ namespace minissh {
                 return postfix;
             }
         }
+    }
+
+    std::string transport_layer::_try_read_string_from_buffer(const uint8_t* buffer, uint32_t max_length) const {
+        uint32_t length;
+        _read_from_buffer_no_offset(buffer, &length);
+
+        if (length > max_length) {
+            throw std::runtime_error("string too long");
+        }
+
+        return std::string(reinterpret_cast<const char*>(buffer), length);
     }
 }

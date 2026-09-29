@@ -10,6 +10,7 @@ namespace minissh {
       public:
         virtual ~host_key() = default;
         virtual constexpr std::string name() const = 0;
+        virtual constexpr std::string key_name() const = 0;
 
         virtual bool verify(
             const secure_buffer& h,
