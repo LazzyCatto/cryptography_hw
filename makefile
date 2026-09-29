@@ -1,5 +1,5 @@
-MAIN_SRCS := $(shell git ls-files '*.cpp')
-MAIN_HDRS := $(shell git ls-files '*.h')
+SRCS := $(shell git ls-files '*.cpp')
+HDRS := $(shell git ls-files '*.h')
 
 OBJS := $(SRCS:.cpp=.o)
 
