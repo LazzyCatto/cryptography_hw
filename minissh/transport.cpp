@@ -6,6 +6,46 @@
 #include "logger.h"
 
 namespace minissh {
+    transport_layer::transport_layer(transport_layer&& other) {
+        if (&other == this) {
+            return;
+        }
+
+        _closed = other._closed;
+        _client_protocol_name = std::move(other._client_protocol_name);
+        _server_protocol_name = std::move(other._server_protocol_name);
+        _socket = std::move(other._socket);
+        _recv_counter = other._recv_counter;
+        _send_counter = other._send_counter;
+        _selected_algos = std::move(other._selected_algos);
+        _session_id = std::move(other._session_id);
+        _first_kex = other._first_kex;
+        _keys = std::move(other._keys);
+
+        other._closed = true;
+    }
+
+    transport_layer& transport_layer::operator=(transport_layer&& other) {
+        if (&other == this) {
+            return *this;
+        }
+
+        _closed = other._closed;
+        _client_protocol_name = std::move(other._client_protocol_name);
+        _server_protocol_name = std::move(other._server_protocol_name);
+        _socket = std::move(other._socket);
+        _recv_counter = other._recv_counter;
+        _send_counter = other._send_counter;
+        _selected_algos = std::move(other._selected_algos);
+        _session_id = std::move(other._session_id);
+        _first_kex = other._first_kex;
+        _keys = std::move(other._keys);
+
+        other._closed = true;
+
+        return *this;
+    }
+
     void transport_layer::init_kex() {
         LOG_INFO("start KEX init");
         algorythms selected_algos;
@@ -89,8 +129,6 @@ namespace minissh {
 
         packet result;
         if (use_enc) {
-            LOG_DEBUG(std::format("use \"{}\"", _selected_algos.encryption_algorithms_server_to_client->name()));
-
             uint8_t size_bytes[4];
             _socket.recv_bytes(size_bytes, 4);
 
@@ -164,9 +202,9 @@ namespace minissh {
         }
 
         LOG_DEBUG(std::format(
-            "recieving packet id={}, msg_number={}",
+            "recieving packet id={}, msg_num={}",
             _recv_counter,
-            static_cast<int>(result.message_number())
+            msg_num_to_string(result.message_number())
         ));
         ++_recv_counter;
         return result;
@@ -176,7 +214,7 @@ namespace minissh {
         LOG_DEBUG(std::format(
             "sending packet id={}, msg_number={}",
             _send_counter,
-            static_cast<int>(to_send.message_number())
+            msg_num_to_string(to_send.message_number())
         ));
 
         bool use_mac = bool(_selected_algos.mac_algorithms_client_to_server);

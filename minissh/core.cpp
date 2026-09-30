@@ -79,6 +79,7 @@ namespace minissh {
             username,
             password
         };
+        _transport->send(packet{user_auth});
         packet responce = _safe_recv();
         if (responce.message_number() == MINISSH_USERAUTH_FAILURE) {
             throw std::runtime_error("wrong password");
@@ -164,6 +165,8 @@ namespace minissh {
     }
 
     void core::_request_service(const std::string& service_name) {
+        LOG_DEBUG(std::format("requesting service \"{}\"", service_name));
+
         if (is_closed()) {
             throw std::runtime_error("closed");
         }

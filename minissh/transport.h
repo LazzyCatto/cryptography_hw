@@ -24,7 +24,7 @@ namespace minissh {
     class transport_layer {
       public:
         transport_layer(const char* host, const char* port, const char* protocol_name) :
-            _closed{true},
+            _closed{false},
             _socket{host, port},
             _client_protocol_name(protocol_name),
             _recv_counter{0},
@@ -39,10 +39,10 @@ namespace minissh {
          ~transport_layer() { close(); }
 
         transport_layer(const transport_layer&) = delete;
-        transport_layer(transport_layer&&) = default;
+        transport_layer(transport_layer&&);
 
         transport_layer& operator=(const transport_layer&) = delete;
-        transport_layer& operator=(transport_layer&&) = default;
+        transport_layer& operator=(transport_layer&&);
 
         void close() {
             if (!_closed) {
