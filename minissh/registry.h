@@ -17,6 +17,10 @@ namespace minissh {
         { obj.name() } -> std::convertible_to<std::string>;
     };
 
+    namespace {
+        const namelist _none_list{"none"};
+    }
+
     template <namable T>
     class registry {
       public:
@@ -25,7 +29,7 @@ namespace minissh {
         registry() = default;
 
         const std::vector<std::string>& get_value_names() const {
-            return _value_names;
+            return _value_names.empty() ? _none_list : _value_names;
         }
         std::unique_ptr<T> get_value(const std::string& name) {
             auto it = _factories.find(name);

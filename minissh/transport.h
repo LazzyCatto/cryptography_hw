@@ -24,6 +24,7 @@ namespace minissh {
     class transport_layer {
       public:
         transport_layer(const char* host, const char* port, const char* protocol_name) :
+            _closed{true},
             _socket{host, port},
             _client_protocol_name(protocol_name),
             _recv_counter{0},
@@ -35,6 +36,21 @@ namespace minissh {
         transport_layer(const char* host, const char* port) : transport_layer(host, port, "SSH-2.0-minissh_1.0\r\n") {}
         transport_layer(const char* host) : transport_layer(host, "22") {}
         transport_layer() : transport_layer("localhost") {}
+         ~transport_layer() { close(); }
+
+        transport_layer(const transport_layer&) = delete;
+        transport_layer(transport_layer&&) = default;
+
+        transport_layer& operator=(const transport_layer&) = delete;
+        transport_layer& operator=(transport_layer&&) = default;
+
+        void close() {
+            if (!_closed) {
+                LOG_INFO("close client_transport_layer");
+                _closed = true;
+            }
+        }
+        bool is_closed() const noexcept { return _closed; }
 
         void send(packet&&);
         packet recv();
@@ -45,6 +61,8 @@ namespace minissh {
         uint32_t send_counter() const { return _send_counter; }
 
       private:
+        bool _closed;
+
         std::string _client_protocol_name;
         std::string _server_protocol_name;
 

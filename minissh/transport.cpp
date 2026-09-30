@@ -84,7 +84,6 @@ namespace minissh {
     }
 
     packet transport_layer::recv() {
-        LOG_DEBUG(std::format("recieving packet id={}", _recv_counter));
         bool use_mac = bool(_selected_algos.mac_algorithms_server_to_client);
         bool use_enc = bool(_selected_algos.encryption_algorithms_server_to_client);
 
@@ -164,13 +163,21 @@ namespace minissh {
             }
         }
 
+        LOG_DEBUG(std::format(
+            "recieving packet id={}, msg_number={}",
+            _recv_counter,
+            static_cast<int>(result.message_number())
+        ));
         ++_recv_counter;
         return result;
     }
 
     void transport_layer::send(packet&& to_send) {
-        LOG_DEBUG(std::format("sending packet id={}", _send_counter));
-        LOG_DEBUG(std::format("msg_num: {}", static_cast<int>(to_send.message_number())));
+        LOG_DEBUG(std::format(
+            "sending packet id={}, msg_number={}",
+            _send_counter,
+            static_cast<int>(to_send.message_number())
+        ));
 
         bool use_mac = bool(_selected_algos.mac_algorithms_client_to_server);
         bool use_enc = bool(_selected_algos.encryption_algorithms_client_to_server);
@@ -221,48 +228,60 @@ namespace minissh {
     void transport_layer::_init_keys() {
         LOG_DEBUG("initializing keys");
 
-        _keys.initial_iv_client_to_server = _get_key(
-            _selected_algos.kex_algorithms->shared_secret(),
-            _selected_algos.kex_algorithms->exchange_hash(),
-            'A',
-            _session_id,
-            _selected_algos.encryption_algorithms_client_to_server->iv_length()
-        );
-        _keys.initial_iv_server_to_client = _get_key(
-            _selected_algos.kex_algorithms->shared_secret(),
-            _selected_algos.kex_algorithms->exchange_hash(),
-            'B',
-            _session_id,
-            _selected_algos.encryption_algorithms_server_to_client->iv_length()
-        );
-        _keys.encryption_key_client_to_server = _get_key(
-            _selected_algos.kex_algorithms->shared_secret(),
-            _selected_algos.kex_algorithms->exchange_hash(),
-            'C',
-            _session_id,
-            _selected_algos.encryption_algorithms_client_to_server->key_length()
-        );
-        _keys.encryption_key_server_to_client = _get_key(
-            _selected_algos.kex_algorithms->shared_secret(),
-            _selected_algos.kex_algorithms->exchange_hash(),
-            'D',
-            _session_id,
-            _selected_algos.encryption_algorithms_server_to_client->key_length()
-        );
-        _keys.integrity_key_client_to_server = _get_key(
-            _selected_algos.kex_algorithms->shared_secret(),
-            _selected_algos.kex_algorithms->exchange_hash(),
-            'E',
-            _session_id,
-            _selected_algos.mac_algorithms_client_to_server->key_length()
-        );
-        _keys.integrity_key_server_to_client = _get_key(
-            _selected_algos.kex_algorithms->shared_secret(),
-            _selected_algos.kex_algorithms->exchange_hash(),
-            'F',
-            _session_id,
-            _selected_algos.mac_algorithms_server_to_client->key_length()
-        );
+        if (_selected_algos.encryption_algorithms_client_to_server) {
+            _keys.initial_iv_client_to_server = _get_key(
+                _selected_algos.kex_algorithms->shared_secret(),
+                _selected_algos.kex_algorithms->exchange_hash(),
+                'A',
+                _session_id,
+                _selected_algos.encryption_algorithms_client_to_server->iv_length()
+            );
+        }
+        if (_selected_algos.encryption_algorithms_server_to_client) {
+            _keys.initial_iv_server_to_client = _get_key(
+                _selected_algos.kex_algorithms->shared_secret(),
+                _selected_algos.kex_algorithms->exchange_hash(),
+                'B',
+                _session_id,
+                _selected_algos.encryption_algorithms_server_to_client->iv_length()
+            );
+        }
+        if (_selected_algos.encryption_algorithms_client_to_server) {
+            _keys.encryption_key_client_to_server = _get_key(
+                _selected_algos.kex_algorithms->shared_secret(),
+                _selected_algos.kex_algorithms->exchange_hash(),
+                'C',
+                _session_id,
+                _selected_algos.encryption_algorithms_client_to_server->key_length()
+            );
+        }
+        if (_selected_algos.encryption_algorithms_server_to_client) {
+            _keys.encryption_key_server_to_client = _get_key(
+                _selected_algos.kex_algorithms->shared_secret(),
+                _selected_algos.kex_algorithms->exchange_hash(),
+                'D',
+                _session_id,
+                _selected_algos.encryption_algorithms_server_to_client->key_length()
+            );
+        }
+        if (_selected_algos.mac_algorithms_client_to_server) {
+            _keys.integrity_key_client_to_server = _get_key(
+                _selected_algos.kex_algorithms->shared_secret(),
+                _selected_algos.kex_algorithms->exchange_hash(),
+                'E',
+                _session_id,
+                _selected_algos.mac_algorithms_client_to_server->key_length()
+            );
+        }
+        if (_selected_algos.mac_algorithms_server_to_client) {
+            _keys.integrity_key_server_to_client = _get_key(
+                _selected_algos.kex_algorithms->shared_secret(),
+                _selected_algos.kex_algorithms->exchange_hash(),
+                'F',
+                _session_id,
+                _selected_algos.mac_algorithms_server_to_client->key_length()
+            );
+        }
     }
 
     void transport_layer::_init_algos() {
@@ -338,13 +357,17 @@ namespace minissh {
             throw std::runtime_error("no suitable mac was found");
         }
 
-        selected_algos->kex_algorithms->init(
-            _client_protocol_name,
-            _server_protocol_name,
-            i_c,
-            i_s,
-            [this](packet&& to_send) { this->send(std::move(to_send)); }
-        );
+        if (selected_algos->kex_algorithms) {
+            selected_algos->kex_algorithms->init(
+                _client_protocol_name,
+                _server_protocol_name,
+                i_c,
+                i_s,
+                [this](packet&& to_send) { this->send(std::move(to_send)); }
+            );
+        } else {
+            LOG_WARN("no KEX is used");
+        }
     }
 
     void transport_layer::_prepare_protolcol_list(keyinit* result) const {
