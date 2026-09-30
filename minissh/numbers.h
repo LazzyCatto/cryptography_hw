@@ -31,7 +31,7 @@ namespace minissh {
     inline constexpr uint8_t MINISSH_CHANNEL_OPEN_FAILURE = 92;
     inline constexpr uint8_t MINISSH_CHANNEL_DATA = 94;
 
-    std::string msg_num_to_string(uint8_t msg_num) {
+    inline std::string msg_num_to_string(uint8_t msg_num) {
         switch (msg_num) {
             case MINISSH_DISCONNECT:
                 return "MINISSH_DISCONNECT";
