@@ -3,10 +3,13 @@
 #include <cstring>
 #include <format>
 #include <netdb.h>
+#include <netinet/tcp.h>
 #include <stdexcept>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
+
+#include "logger.h"
 
 namespace minissh {
     void packet::set_padding_to_be_multiple(uint8_t multiple) {
@@ -81,6 +84,9 @@ namespace minissh {
             close(sfd);
             sfd = -1;
         }
+
+        int one = 1;
+        setsockopt(sfd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
 
         freeaddrinfo(res);
 

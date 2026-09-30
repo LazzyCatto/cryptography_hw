@@ -1,30 +1,41 @@
 #include "logger.h"
 
 namespace minissh {
-    void logger::init(const std::string& filename) {
-        std::lock_guard<std::mutex> lock(log_mutex);
-        if (log_file.is_open()) {
-            log_file.close();
+    void logger::init(bool use_cin, const std::string& filename) {
+        _use_cin = use_cin;
+        if (!filename.empty()) {
+            std::lock_guard<std::mutex> lock(_log_mutex);
+            if (_log_file.is_open()) {
+                _log_file.close();
+            }
+            _log_file.open(filename, std::ios::app);
         }
-        log_file.open(filename, std::ios::app);
+        log(
+            minissh::loglevel::INFO,
+            __FILE__,
+            __LINE__,
+            std::format("SLART NEW LOGGING SESSION")
+        );
     }
 
     void logger::log(loglevel level, const std::string& file, int line, const std::string& message) {
-        std::lock_guard<std::mutex> lock(log_mutex);
+        std::lock_guard<std::mutex> lock(_log_mutex);
 
-        std::string to_log = get_timestamp() + 
-                            " [" + loglevel_to_string(level) + "] " +
+        std::string to_log = _get_timestamp() + 
+                            " [" + _loglevel_to_string(level) + "] " +
                             "[" + file + ":" + std::to_string(line) + "] " + 
                             message;
 
-        std::cout << to_log << std::endl;
+        if (_use_cin) {
+            std::cout << to_log << std::endl;
+        }
 
-        if (log_file.is_open()) {
-            log_file << to_log << std::endl;
+        if (_log_file.is_open()) {
+            _log_file << to_log << std::endl;
         }
     }
 
-    std::string logger::loglevel_to_string(loglevel level) {
+    std::string logger::_loglevel_to_string(loglevel level) {
         switch (level) {
             case loglevel::DEBUG:   return "DEBUG";
             case loglevel::INFO:    return "INFO";
@@ -34,7 +45,7 @@ namespace minissh {
         }
     }
 
-    std::string logger::get_timestamp() {
+    std::string logger::_get_timestamp() {
         auto now = std::chrono::system_clock::now();
         auto in_time_t = std::chrono::system_clock::to_time_t(now);
         std::stringstream ss;

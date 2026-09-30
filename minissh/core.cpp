@@ -206,8 +206,10 @@ namespace minissh {
         std::atomic<bool> finished{false};
 
         std::thread reader([this, &finished] {
+            LOG_DEBUG(std::format("reader thread={}", std::hash<std::thread::id>{}(std::this_thread::get_id())));
             try {
                 while (!finished.load()) {
+                    LOG_DEBUG("waiting for the packet");
                     packet p = _transport->recv();
                     switch (p.message_number()) {
                         case MINISSH_CHANNEL_DATA: {
@@ -246,6 +248,7 @@ namespace minissh {
             }
         });
 
+        LOG_DEBUG(std::format("writer thread={}", std::hash<std::thread::id>{}(std::this_thread::get_id())));
         uint8_t buffer[4096];
         while (!finished.load()) {
             pollfd pfd{STDIN_FILENO, POLLIN, 0};

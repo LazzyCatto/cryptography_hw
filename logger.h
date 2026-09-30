@@ -22,7 +22,7 @@ namespace minissh {
     };
 
     class logger {
-    public:
+      public:
         static logger& get_instance() {
             static logger instance{};
             return instance;
@@ -33,21 +33,23 @@ namespace minissh {
         logger(logger&&) = delete;
         logger& operator=(logger&&) = delete;
 
-        void init(const std::string&);
+        void init(bool = true, const std::string& = "");
         void log(loglevel level, const std::string&, int, const std::string&);
-    private:
+      private:
         logger() = default;
         ~logger() {
-            if (log_file.is_open()) {
-                log_file.close();
+            if (_log_file.is_open()) {
+                _log_file.close();
             }
         }
 
-        std::ofstream log_file;
-        std::mutex log_mutex;
+        std::ofstream _log_file;
+        std::mutex _log_mutex;
 
-        std::string loglevel_to_string(loglevel);
-        std::string get_timestamp();
+        bool _use_cin;
+
+        std::string _loglevel_to_string(loglevel);
+        std::string _get_timestamp();
     };
 
     template <typename T>
