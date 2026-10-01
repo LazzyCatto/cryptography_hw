@@ -235,11 +235,14 @@ namespace minissh {
             _transport->send(packet{msg});
         }
 
+        sigset_t sigset;
+        sigemptyset(&sigset);
+        sigaddset(&sigset, SIGWINCH);
+        pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
         std::thread sigwinch_thread([this, &finished] {
             sigset_t sigset;
             sigemptyset(&sigset);
             sigaddset(&sigset, SIGWINCH);
-            pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
             while (!finished.load()) {
                 struct timespec timeout{0, 100000000};
                 if (sigtimedwait(&sigset, nullptr, &timeout) > 0) {
