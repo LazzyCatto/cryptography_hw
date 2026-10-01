@@ -84,8 +84,6 @@ namespace minissh {
         bool _first_kex;
 
         struct keys {
-            secure_buffer initial_iv_client_to_server;
-            secure_buffer initial_iv_server_to_client;
             secure_buffer encryption_key_client_to_server;
             secure_buffer encryption_key_server_to_client;
             secure_buffer integrity_key_client_to_server;

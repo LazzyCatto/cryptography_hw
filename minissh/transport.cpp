@@ -273,28 +273,10 @@ namespace minissh {
         LOG_DEBUG(std::format("H = {}", string_repr(_selected_algos.kex_algorithms->exchange_hash())));
 
         if (_selected_algos.encryption_algorithms_client_to_server) {
-            _keys.initial_iv_client_to_server = _get_key(
-                _selected_algos.kex_algorithms->shared_secret(),
-                _selected_algos.kex_algorithms->exchange_hash(),
-                'A',
-                _session_id,
-                _selected_algos.encryption_algorithms_client_to_server->iv_length()
-            );
-        }
-        if (_selected_algos.encryption_algorithms_server_to_client) {
-            _keys.initial_iv_server_to_client = _get_key(
-                _selected_algos.kex_algorithms->shared_secret(),
-                _selected_algos.kex_algorithms->exchange_hash(),
-                'B',
-                _session_id,
-                _selected_algos.encryption_algorithms_server_to_client->iv_length()
-            );
-        }
-        if (_selected_algos.encryption_algorithms_client_to_server) {
             _keys.encryption_key_client_to_server = _get_key(
                 _selected_algos.kex_algorithms->shared_secret(),
                 _selected_algos.kex_algorithms->exchange_hash(),
-                'C',
+                'A',
                 _session_id,
                 _selected_algos.encryption_algorithms_client_to_server->key_length()
             );
@@ -303,7 +285,7 @@ namespace minissh {
             _keys.encryption_key_server_to_client = _get_key(
                 _selected_algos.kex_algorithms->shared_secret(),
                 _selected_algos.kex_algorithms->exchange_hash(),
-                'D',
+                'B',
                 _session_id,
                 _selected_algos.encryption_algorithms_server_to_client->key_length()
             );
@@ -312,7 +294,7 @@ namespace minissh {
             _keys.integrity_key_client_to_server = _get_key(
                 _selected_algos.kex_algorithms->shared_secret(),
                 _selected_algos.kex_algorithms->exchange_hash(),
-                'E',
+                'C',
                 _session_id,
                 _selected_algos.mac_algorithms_client_to_server->key_length()
             );
@@ -321,7 +303,7 @@ namespace minissh {
             _keys.integrity_key_server_to_client = _get_key(
                 _selected_algos.kex_algorithms->shared_secret(),
                 _selected_algos.kex_algorithms->exchange_hash(),
-                'F',
+                'D',
                 _session_id,
                 _selected_algos.mac_algorithms_server_to_client->key_length()
             );
@@ -345,14 +327,12 @@ namespace minissh {
 
         if (_selected_algos.encryption_algorithms_client_to_server) {
             _selected_algos.encryption_algorithms_client_to_server->init(
-                _keys.initial_iv_client_to_server,
                 _keys.encryption_key_client_to_server
             );
         }
 
         if (_selected_algos.encryption_algorithms_server_to_client) {
             _selected_algos.encryption_algorithms_server_to_client->init(
-                _keys.initial_iv_server_to_client,
                 _keys.encryption_key_server_to_client
             );
         }
