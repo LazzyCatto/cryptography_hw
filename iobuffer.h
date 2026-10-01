@@ -37,6 +37,7 @@ namespace minissh {
     template <> inline uint32_t _size_of<bool>(const bool&) { return 1; }
     template <> inline uint32_t _size_of<uint8_t>(const uint8_t&) { return 1; }
     template <> inline uint32_t _size_of<byte16>(const byte16&) { return 16; }
+    template <> inline uint32_t _size_of<uint16_t>(const uint16_t&) { return 2; }
     template <> inline uint32_t _size_of<uint32_t>(const uint32_t&) { return 4; }
     template <> inline uint32_t _size_of<std::string>(const std::string& value) { return value.length() + 4; }
     template <> inline uint32_t _size_of<secure_buffer>(const secure_buffer& value) { return value.length() + 4; }
@@ -121,6 +122,7 @@ DEF_N_TUPLE(19, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14,
     template <> void _write_in_buffer(uint8_t*, uint32_t&, const uint8_t&, bool);
     template <> void _write_in_buffer(uint8_t*, uint32_t&, const byte16&, bool);
     template <> void _write_in_buffer(uint8_t*, uint32_t&, const uint32_t&, bool);
+    template <> void _write_in_buffer(uint8_t*, uint32_t&, const uint16_t&, bool);
     template <> void _write_in_buffer(uint8_t*, uint32_t&, const uint64_t&, bool);
     template <> void _write_in_buffer(uint8_t*, uint32_t&, const std::string&, bool);
     template <> void _write_in_buffer(uint8_t*, uint32_t&, const secure_buffer&, bool);
@@ -131,6 +133,7 @@ DEF_N_TUPLE(19, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14,
     template <> void _read_from_buffer(const uint8_t*, uint32_t&, uint8_t*, bool);
     template <> void _read_from_buffer(const uint8_t*, uint32_t&, byte16*, bool);
     template <> void _read_from_buffer(const uint8_t*, uint32_t&, uint32_t*, bool);
+    template <> void _read_from_buffer(const uint8_t*, uint32_t&, uint16_t*, bool);
     template <> void _read_from_buffer(const uint8_t*, uint32_t&, uint64_t*, bool);
     template <> void _read_from_buffer(const uint8_t*, uint32_t&, std::string*, bool);
     template <> void _read_from_buffer(const uint8_t*, uint32_t&, secure_buffer*, bool);

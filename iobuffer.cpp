@@ -27,6 +27,12 @@ namespace minissh {
     }
 
     template <>
+    void _write_in_buffer(uint8_t* buffer, uint32_t& offset, const uint16_t& value, bool skip_size) {
+        buffer[offset++] = static_cast<uint8_t>((value >>  8) & 0xFF);
+        buffer[offset++] = static_cast<uint8_t>((value      ) & 0xFF);
+    }
+
+    template <>
     void _write_in_buffer(uint8_t* buffer, uint32_t& offset, const uint64_t& value, bool skip_size) {
         buffer[offset++] = static_cast<uint8_t>((value >> 56) & 0xFF);
         buffer[offset++] = static_cast<uint8_t>((value >> 48) & 0xFF);
@@ -116,6 +122,14 @@ namespace minissh {
             (uint32_t(buffer[offset + 2]) <<  8) |
             (uint32_t(buffer[offset + 3])      );
         offset += 4;
+    }
+
+    template <>
+    void _read_from_buffer(const uint8_t* buffer, uint32_t& offset, uint16_t* out, bool skip_size) {
+        *out =
+            (uint32_t(buffer[offset    ]) <<  8) |
+            (uint32_t(buffer[offset + 1])      );
+        offset += 2;
     }
 
     template <>

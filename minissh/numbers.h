@@ -30,6 +30,7 @@ namespace minissh {
     inline constexpr uint8_t MINISSH_CHANNEL_OPEN = 90;
     inline constexpr uint8_t MINISSH_CHANNEL_OPEN_CONFIRMATION = 91;
     inline constexpr uint8_t MINISSH_CHANNEL_OPEN_FAILURE = 92;
+    inline constexpr uint8_t MINISSH_CHANNEL_WINDOW_ADJUST = 93;
     inline constexpr uint8_t MINISSH_CHANNEL_DATA = 94;
 
     inline std::string msg_num_to_string(uint8_t msg_num) {
@@ -76,6 +77,8 @@ namespace minissh {
                 return "MINISSH_CHANNEL_OPEN_CONFIRMATION";
             case MINISSH_CHANNEL_OPEN_FAILURE:
                 return "MINISSH_CHANNEL_OPEN_FAILURE";
+            case MINISSH_CHANNEL_WINDOW_ADJUST:
+                return "MINISSH_CHANNEL_WINDOW_ADJUST";
             case MINISSH_CHANNEL_DATA:
                 return "MINISSH_CHANNEL_DATA";
             default:

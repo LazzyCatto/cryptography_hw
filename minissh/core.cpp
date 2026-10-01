@@ -2,9 +2,12 @@
 
 #include <atomic>
 #include <format>
+#include <signal.h>
+#include <sys/ioctl.h>
 #include <poll.h>
 #include <thread>
 
+#include "terminal_mode.h"
 #include "logger.h"
 
 namespace minissh {
@@ -215,7 +218,47 @@ namespace minissh {
     }
 
     void core::_transfer_data() {
+        terminal_raw_mode raw_guard;
         std::atomic<bool> finished{false};
+
+        struct winsize ws;
+        if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) == 0) {
+            struct window_size_message {
+                uint8_t msg_num;
+                uint16_t rows;
+                uint16_t cols;
+            } msg {
+                MINISSH_CHANNEL_WINDOW_ADJUST,
+                ws.ws_row,
+                ws.ws_col
+            };
+            _transport->send(packet{msg});
+        }
+
+        std::thread sigwinch_thread([this, &finished] {
+            sigset_t sigset;
+            sigemptyset(&sigset);
+            sigaddset(&sigset, SIGWINCH);
+            pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
+            while (!finished.load()) {
+                struct timespec timeout{0, 100000000};
+                if (sigtimedwait(&sigset, nullptr, &timeout) > 0) {
+                    struct winsize ws;
+                    if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) == 0) {
+                        struct window_size_message {
+                            uint8_t msg_num;
+                            uint16_t rows;
+                            uint16_t cols;
+                        } msg {
+                            MINISSH_CHANNEL_WINDOW_ADJUST,
+                            ws.ws_row,
+                            ws.ws_col
+                        };
+                        _transport->send(packet{msg});
+                    }
+                }
+            }
+        });
 
         std::thread reader([this, &finished] {
             LOG_DEBUG(std::format("reader thread={}", std::hash<std::thread::id>{}(std::this_thread::get_id())));
@@ -310,6 +353,10 @@ namespace minissh {
 
         if (reader.joinable()) {
             reader.join();
+        }
+
+        if (sigwinch_thread.joinable()) {
+            sigwinch_thread.join();
         }
     }
 }
