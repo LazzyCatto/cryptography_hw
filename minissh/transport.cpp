@@ -134,7 +134,7 @@ namespace minissh {
 
             uint32_t packet_length = _selected_algos.encryption_algorithms_server_to_client->decript_length(size_bytes);
 
-            if (packet_length > 1000) {
+            if (packet_length > 5000) {
                 throw std::runtime_error("message too long, probably the encryption problem");
             }
             if ((packet_length + 4) % _selected_algos.encryption_algorithms_server_to_client->block_length() != 0) {
@@ -159,7 +159,7 @@ namespace minissh {
             uint32_t payload_length = packet_length - padding_length - 1;
             result = packet{payload_length, padding_length};
             memcpy(result.payload().data(), encripted_data.data() + 5, result.payload_length());
-            memcpy(result.padding().data(), encripted_data.data() + packet_length - padding_length + 4, result.payload_length());
+            memcpy(result.padding().data(), encripted_data.data() + packet_length - padding_length + 4, result.padding_length());
         } else {
             uint8_t size_bytes[5];
             _socket.recv_bytes(size_bytes, 5);
@@ -170,7 +170,7 @@ namespace minissh {
             _read_from_buffer(size_bytes, offset, &packet_length);
             _read_from_buffer(size_bytes, offset, &padding_length);
 
-            if (packet_length > 1000) {
+            if (packet_length > 5000) {
                 throw std::runtime_error("message too long, probably the littleendian format");
             }
             if ((packet_length + 4) % 8 != 0) {
@@ -254,9 +254,13 @@ namespace minissh {
         LOG_INFO("initializing transport layer");
         _socket.send_string(_client_protocol_name + '\n');
         _server_protocol_name = _socket.recv_string();
-
-        LOG_INFO(std::format("client_protocol_name : \"{}\"", _client_protocol_name));
-        LOG_INFO(std::format("server_protocol_name : \"{}\"", _server_protocol_name));
+        
+        std::string_view _formated_client_protocol_name{_client_protocol_name};
+        _formated_client_protocol_name.remove_suffix(2);
+        LOG_INFO(std::format("client_protocol_name : \"{}\"", _formated_client_protocol_name));
+        std::string_view _formated_server_protocol_name{_server_protocol_name};
+        _formated_server_protocol_name.remove_suffix(2);
+        LOG_INFO(std::format("server_protocol_name : \"{}\"", _formated_server_protocol_name));
 
         if (!_server_protocol_name.starts_with("MINISSH-")) {
             throw std::runtime_error("invalid first message");
@@ -265,6 +269,8 @@ namespace minissh {
 
     void transport_layer::_init_keys() {
         LOG_DEBUG("initializing keys");
+        LOG_DEBUG(std::format("K = {}", string_repr(_selected_algos.kex_algorithms->shared_secret())));
+        LOG_DEBUG(std::format("H = {}", string_repr(_selected_algos.kex_algorithms->exchange_hash())));
 
         if (_selected_algos.encryption_algorithms_client_to_server) {
             _keys.initial_iv_client_to_server = _get_key(

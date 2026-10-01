@@ -150,18 +150,29 @@ namespace minissh {
         _request_service("connection");
 
         _transport->send(packet{text_message{
-            MINISSH_CHANNEL_OPEN,
+            MINISSH_SECRET_REQUEST,
             secret_key
         }});
-        packet responce = _safe_recv();
-        if (responce.message_number() == MINISSH_CHANNEL_OPEN_FAILURE) {
-            text_message text_msg = responce.to_struct<text_message>();
-            throw std::runtime_error(text_msg.text);
+        {
+            packet responce = _safe_recv();
+            if (responce.message_number() == MINISSH_SECRET_FALIURE) {
+                throw std::runtime_error("wrong secret");
+            }
+            if (responce.message_number() != MINISSH_SECRET_SUCCESS) {
+                throw std::runtime_error("connect");
+            }
         }
-        if (responce.message_number() == MINISSH_CHANNEL_OPEN_CONFIRMATION) {
-            return;
+
+        _transport->send(packet{info_message{MINISSH_CHANNEL_OPEN}});
+        {
+            packet responce = _safe_recv();
+            if (responce.message_number() == MINISSH_CHANNEL_OPEN_FAILURE) {
+                throw std::runtime_error("failed to open channel");
+            }
+            if (responce.message_number() != MINISSH_CHANNEL_OPEN_CONFIRMATION) {
+                throw std::runtime_error("connect");
+            }
         }
-        throw std::runtime_error("connect");
     }
 
     void core::_request_service(const std::string& service_name) {
@@ -194,7 +205,8 @@ namespace minissh {
                 continue;
             }
             if (recv_packet.message_number() == MINISSH_DISCONNECT) {
-                LOG_INFO("disconnected");
+                text_message text_msg = recv_packet.to_struct<text_message>();
+                LOG_INFO(std::format("disconnected, reason: \"{}\"", text_msg.text));
                 close();
                 throw std::runtime_error("closed");
             }
