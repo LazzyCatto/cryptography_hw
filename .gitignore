@@ -1,0 +1,14 @@
+*.out
+*.o
+*.d
+test.cpp
+*.log
+
+src/crypto/cipher/*
+!cipher.h
+
+src/crypto/host_key/*
+!host_key.h
+
+src/crypto/kex/*
+!kex.h
