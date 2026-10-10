@@ -1,5 +1,7 @@
 #include "src/logger.h"
 
+#include <regex>
+
 namespace minissh {
     void logger::init(bool use_cin, const std::string& filename) {
         _use_cin = use_cin;
@@ -16,6 +18,37 @@ namespace minissh {
             __LINE__,
             std::format("SLART NEW LOGGING SESSION")
         );
+    }
+
+    std::string _get_free_logger_name(fs::path path, std::string_view logger_name, int* logger_id) {
+        fs::directory_iterator dir_iter{path};
+
+        std::regex logger_regex(std::format("(^{}_\\d+\\.log$)", logger_name));
+        std::regex int_regex{R"(\d+)"};
+        int max_id = 0;
+        for (fs::directory_entry dir_entry : dir_iter) {
+            if (!dir_entry.is_regular_file()) {
+                continue;
+            }
+            std::string filename = dir_entry.path().filename().string();
+            if (!std::regex_match(filename, logger_regex)) {
+                continue;
+            }
+            std::sregex_iterator it{filename.begin(), filename.end(), int_regex};
+            std::sregex_iterator end;
+            if (it == end) {
+                continue;
+            }
+            int id = std::stoi(it->str());
+            if (max_id < id) {
+                max_id = id;
+            }
+        }
+        ++max_id;
+        if (logger_id) {
+            *logger_id = max_id;
+        }
+        return path / std::format("{}_{}.log", logger_name, max_id);
     }
 
     void logger::log(loglevel level, const std::string& file, int line, const std::string& message) {

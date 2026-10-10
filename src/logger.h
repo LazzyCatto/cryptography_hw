@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 #include <mutex>
 #include <string>
 #include <chrono>
@@ -14,6 +15,8 @@
 #include "src/types/mpint.h"
 
 namespace minissh {
+    namespace fs = std::filesystem;
+
     enum class loglevel {
         DEBUG,
         INFO,
@@ -51,6 +54,8 @@ namespace minissh {
         std::string _loglevel_to_string(loglevel);
         std::string _get_timestamp();
     };
+
+    std::string _get_free_logger_name(fs::path, std::string_view, int* = nullptr);
 
     template <typename T>
     std::string string_repr(const T&);
