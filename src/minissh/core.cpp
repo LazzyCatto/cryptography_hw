@@ -222,26 +222,33 @@ namespace minissh {
         sigaddset(&sigset, SIGWINCH);
         pthread_sigmask(SIG_BLOCK, &sigset, nullptr);
         std::thread sigwinch_thread([this, &finished] {
-            sigset_t sigset;
-            sigemptyset(&sigset);
-            sigaddset(&sigset, SIGWINCH);
-            while (!finished.load()) {
-                struct timespec timeout{0, 100000000};
-                if (sigtimedwait(&sigset, nullptr, &timeout) > 0) {
-                    struct winsize ws;
-                    if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) == 0) {
-                        struct window_size_message {
-                            uint8_t msg_num;
-                            uint16_t rows;
-                            uint16_t cols;
-                        } msg {
-                            MINISSH_CHANNEL_WINDOW_ADJUST,
-                            ws.ws_row,
-                            ws.ws_col
-                        };
-                        _transport->send(packet{msg});
+            try {
+                sigset_t sigset;
+                sigemptyset(&sigset);
+                sigaddset(&sigset, SIGWINCH);
+                while (!finished.load()) {
+                    struct timespec timeout{0, 100000000};
+                    if (sigtimedwait(&sigset, nullptr, &timeout) > 0) {
+                        struct winsize ws;
+                        if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) == 0) {
+                            struct window_size_message {
+                                uint8_t msg_num;
+                                uint16_t rows;
+                                uint16_t cols;
+                            } msg {
+                                MINISSH_CHANNEL_WINDOW_ADJUST,
+                                ws.ws_row,
+                                ws.ws_col
+                            };
+                            _transport->send(packet{msg});
+                        }
                     }
                 }
+            } catch (const std::exception& e) {
+                if (!finished.load()) {
+                    LOG_ERROR(e.what());
+                }
+                finished.store(true);
             }
         });
 

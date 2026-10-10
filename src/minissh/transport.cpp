@@ -153,6 +153,10 @@ namespace minissh {
     }
 
     packet transport_layer::recv_raw() {
+        if (is_closed()) {
+            throw std::runtime_error("transport is closed");
+        }
+
         bool use_mac = bool(_selected_algos.mac_algorithms_server_to_client);
         bool use_enc = bool(_selected_algos.encryption_algorithms_server_to_client);
 
@@ -240,6 +244,10 @@ namespace minissh {
     }
 
     void transport_layer::send(packet&& to_send) {
+        if (is_closed()) {
+            throw std::runtime_error("transport is closed");
+        }
+
         LOG_DEBUG(std::format(
             "sending packet id={}, msg_number={}",
             _send_counter,
