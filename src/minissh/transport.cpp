@@ -18,8 +18,6 @@ namespace minissh {
         _recv_counter = other._recv_counter;
         _send_counter = other._send_counter;
         _selected_algos = std::move(other._selected_algos);
-        _session_id = std::move(other._session_id);
-        _first_kex = other._first_kex;
         _keys = std::move(other._keys);
 
         other._closed = true;
@@ -37,8 +35,6 @@ namespace minissh {
         _recv_counter = other._recv_counter;
         _send_counter = other._send_counter;
         _selected_algos = std::move(other._selected_algos);
-        _session_id = std::move(other._session_id);
-        _first_kex = other._first_kex;
         _keys = std::move(other._keys);
 
         other._closed = true;
@@ -112,12 +108,6 @@ namespace minissh {
 
         LOG_DEBUG("setting up new keys...");
         _selected_algos = std::move(selected_algos);
-
-        if (_first_kex) {
-            LOG_INFO("first kex - setting up session_id");
-            _session_id = _selected_algos.kex_algorithms->exchange_hash();
-            _first_kex = false;
-        }
 
         _init_keys();
         _init_algos();
@@ -269,45 +259,27 @@ namespace minissh {
 
     void transport_layer::_init_keys() {
         LOG_DEBUG("initializing keys");
-        LOG_DEBUG(std::format("K = {}", string_repr(_selected_algos.kex_algorithms->shared_secret())));
-        LOG_DEBUG(std::format("H = {}", string_repr(_selected_algos.kex_algorithms->exchange_hash())));
 
-        if (_selected_algos.encryption_algorithms_client_to_server) {
-            _keys.encryption_key_client_to_server = _get_key(
-                _selected_algos.kex_algorithms->shared_secret(),
-                _selected_algos.kex_algorithms->exchange_hash(),
-                'A',
-                _session_id,
-                _selected_algos.encryption_algorithms_client_to_server->key_length()
-            );
-        }
-        if (_selected_algos.encryption_algorithms_server_to_client) {
-            _keys.encryption_key_server_to_client = _get_key(
-                _selected_algos.kex_algorithms->shared_secret(),
-                _selected_algos.kex_algorithms->exchange_hash(),
-                'B',
-                _session_id,
-                _selected_algos.encryption_algorithms_server_to_client->key_length()
-            );
-        }
-        if (_selected_algos.mac_algorithms_client_to_server) {
-            _keys.integrity_key_client_to_server = _get_key(
-                _selected_algos.kex_algorithms->shared_secret(),
-                _selected_algos.kex_algorithms->exchange_hash(),
-                'C',
-                _session_id,
-                _selected_algos.mac_algorithms_client_to_server->key_length()
-            );
-        }
-        if (_selected_algos.mac_algorithms_server_to_client) {
-            _keys.integrity_key_server_to_client = _get_key(
-                _selected_algos.kex_algorithms->shared_secret(),
-                _selected_algos.kex_algorithms->exchange_hash(),
-                'D',
-                _session_id,
-                _selected_algos.mac_algorithms_server_to_client->key_length()
-            );
-        }
+        _keys.encryption_key_client_to_server = _get_key(
+            _selected_algos.kex_algorithms->shared_secret(),
+            'A',
+            _selected_algos.kex_algorithms->encryption_key_client_to_server()
+        );
+        _keys.encryption_key_server_to_client = _get_key(
+            _selected_algos.kex_algorithms->shared_secret(),
+            'B',
+            _selected_algos.kex_algorithms->encryption_key_server_to_client()
+        );
+        _keys.integrity_key_client_to_server = _get_key(
+            _selected_algos.kex_algorithms->shared_secret(),
+            'C',
+            _selected_algos.kex_algorithms->integrity_key_client_to_server()
+        );
+        _keys.integrity_key_server_to_client = _get_key(
+            _selected_algos.kex_algorithms->shared_secret(),
+            'D',
+            _selected_algos.kex_algorithms->integrity_key_server_to_client()
+        );
     }
 
     void transport_layer::_init_algos() {
@@ -497,16 +469,25 @@ namespace minissh {
 
     secure_buffer transport_layer::_get_key(
         const mpint& k,
-        const secure_buffer& h,
         char x,
-        const secure_buffer& session_id,
+        const secure_buffer& encrypted_key
+    ) {
+        secure_buffer result = encrypted_key;
+        secure_buffer mask = _get_mask(k, x, encrypted_key.length());
+        for (size_t i = 0; i < encrypted_key.length(); ++i) {
+            result[i] ^= mask[i];
+        }
+        return result;
+    }
+
+    secure_buffer transport_layer::_get_mask(
+        const mpint& k,
+        char x,
         uint32_t desired_length
     ) {
         secure_buffer result = sha_256(secure_buffer::cat({
             get_secure_buffer_from_object(k),
-            h,
-            secure_buffer{reinterpret_cast<const uint8_t*>(&x), 1},
-            session_id
+            secure_buffer{reinterpret_cast<const uint8_t*>(&x), 1}
         }));
         if (result.length() >= desired_length) {
             if (result.length() > desired_length) {
@@ -518,7 +499,6 @@ namespace minissh {
         while (true) {
             secure_buffer kn = sha_256(secure_buffer::cat({
                 get_secure_buffer_from_object(k),
-                h,
                 postfix
             }));
             postfix = secure_buffer::cat({

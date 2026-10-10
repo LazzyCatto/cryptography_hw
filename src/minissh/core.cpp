@@ -102,7 +102,7 @@ namespace minissh {
         LOG_DEBUG("reading tunnel");
         _transport->send(packet{info_message{MINISSH_INTERCEPT_RECV_REQUEST}});
         packet responce = _safe_recv();
-        if (responce.message_number() == MINISSH_INTERCEPT_FALIURE) {
+        if (responce.message_number() == MINISSH_INTERCEPT_FAILURE) {
             text_message text_msg = responce.to_struct<text_message>();
             LOG_INFO(text_msg.text);
             return std::nullopt;
@@ -134,7 +134,7 @@ namespace minissh {
         };
         _transport->send(packet{intercept_msg});
         packet responce = _safe_recv();
-        if (responce.message_number() == MINISSH_INTERCEPT_FALIURE) {
+        if (responce.message_number() == MINISSH_INTERCEPT_FAILURE) {
             text_message text_msg = responce.to_struct<text_message>();
             LOG_WARN(text_msg.text);
             return;
@@ -158,7 +158,7 @@ namespace minissh {
         }});
         {
             packet responce = _safe_recv();
-            if (responce.message_number() == MINISSH_SECRET_FALIURE) {
+            if (responce.message_number() == MINISSH_SECRET_FAILURE) {
                 throw std::runtime_error("wrong secret");
             }
             if (responce.message_number() != MINISSH_SECRET_SUCCESS) {

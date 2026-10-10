@@ -20,11 +20,11 @@ namespace minissh {
 
     inline constexpr uint8_t MINISSH_INTERCEPT_RECV_REQUEST = 60;
     inline constexpr uint8_t MINISSH_INTERCEPT_SEND_REQUEST = 61;
-    inline constexpr uint8_t MINISSH_INTERCEPT_FALIURE = 62;
+    inline constexpr uint8_t MINISSH_INTERCEPT_FAILURE = 62;
     inline constexpr uint8_t MINISSH_INTERCEPT_SUCCESS = 63;
 
     inline constexpr uint8_t MINISSH_SECRET_REQUEST = 70;
-    inline constexpr uint8_t MINISSH_SECRET_FALIURE = 71;
+    inline constexpr uint8_t MINISSH_SECRET_FAILURE = 71;
     inline constexpr uint8_t MINISSH_SECRET_SUCCESS = 72;
 
     inline constexpr uint8_t MINISSH_CHANNEL_OPEN = 90;
@@ -61,14 +61,14 @@ namespace minissh {
                 return "MINISSH_INTERCEPT_RECV_REQUEST";
             case MINISSH_INTERCEPT_SEND_REQUEST:
                 return "MINISSH_INTERCEPT_SEND_REQUEST";
-            case MINISSH_INTERCEPT_FALIURE:
-                return "MINISSH_INTERCEPT_FALIURE";
+            case MINISSH_INTERCEPT_FAILURE:
+                return "MINISSH_INTERCEPT_FAILURE";
             case MINISSH_INTERCEPT_SUCCESS:
                 return "MINISSH_INTERCEPT_SUCCESS";
             case MINISSH_SECRET_REQUEST:
                 return "MINISSH_SECRET_REQUEST";
-            case MINISSH_SECRET_FALIURE:
-                return "MINISSH_SECRET_FALIURE";
+            case MINISSH_SECRET_FAILURE:
+                return "MINISSH_SECRET_FAILURE";
             case MINISSH_SECRET_SUCCESS:
                 return "MINISSH_SECRET_SUCCESS";
             case MINISSH_CHANNEL_OPEN:
