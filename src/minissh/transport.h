@@ -6,21 +6,6 @@
 #include "src/minissh/registry.h"
 
 namespace minissh {
-    struct keyinit {
-        uint8_t message_number;
-        std::array<uint8_t, 16> cookie;
-        minissh::namelist kex_algorithms;
-        minissh::namelist server_host_key_algorithms;
-        minissh::namelist encryption_algorithms_client_to_server;
-        minissh::namelist encryption_algorithms_server_to_client;
-        minissh::namelist mac_algorithms_client_to_server;
-        minissh::namelist mac_algorithms_server_to_client;
-    };
-
-    struct newkeys {
-        uint8_t message_number = MINISSH_NEWKEYS;
-    };
-
     class transport_layer {
       public:
         transport_layer(const char* host, const char* port, const char* protocol_name) :
@@ -53,6 +38,7 @@ namespace minissh {
 
         void send(packet&&);
         packet recv();
+        packet recv_raw();
 
         void init_kex();
 
@@ -69,6 +55,17 @@ namespace minissh {
 
         uint32_t _recv_counter;
         uint32_t _send_counter;
+
+        struct keyinit {
+            uint8_t message_number;
+            std::array<uint8_t, 16> cookie;
+            minissh::namelist kex_algorithms;
+            minissh::namelist server_host_key_algorithms;
+            minissh::namelist encryption_algorithms_client_to_server;
+            minissh::namelist encryption_algorithms_server_to_client;
+            minissh::namelist mac_algorithms_client_to_server;
+            minissh::namelist mac_algorithms_server_to_client;
+        };
 
         struct algorythms {
             std::unique_ptr<kex> kex_algorithms = nullptr;

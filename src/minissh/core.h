@@ -40,7 +40,6 @@ namespace minissh {
         std::deque<secure_buffer> _message_queue;
 
         void _request_service(const std::string&);
-        packet _safe_recv();
 
         void _transfer_data();
     };

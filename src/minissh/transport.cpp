@@ -6,6 +6,17 @@
 #include "src/logger.h"
 
 namespace minissh {
+    namespace {
+        struct text_message {
+            uint8_t msg_num;
+            std::string text;
+        };
+
+        struct newkeys {
+            uint8_t message_number = MINISSH_NEWKEYS;
+        };
+    }
+
     transport_layer::transport_layer(transport_layer&& other) {
         if (&other == this) {
             return;
@@ -114,6 +125,24 @@ namespace minissh {
     }
 
     packet transport_layer::recv() {
+        while (true) {
+            packet recv_packet = recv_raw();
+            if (recv_packet.message_number() == MINISSH_DEBUG) {
+                text_message text_msg = recv_packet.to_struct<text_message>();
+                LOG_DEBUG(text_msg.text);
+                continue;
+            }
+            if (recv_packet.message_number() == MINISSH_DISCONNECT) {
+                text_message text_msg = recv_packet.to_struct<text_message>();
+                LOG_INFO(std::format("disconnected, reason: \"{}\"", text_msg.text));
+                close();
+                throw std::runtime_error("closed");
+            }
+            return recv_packet;
+        }
+    }
+
+    packet transport_layer::recv_raw() {
         bool use_mac = bool(_selected_algos.mac_algorithms_server_to_client);
         bool use_enc = bool(_selected_algos.encryption_algorithms_server_to_client);
 

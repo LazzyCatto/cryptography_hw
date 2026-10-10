@@ -83,7 +83,7 @@ namespace minissh {
             password
         };
         _transport->send(packet{user_auth});
-        packet responce = _safe_recv();
+        packet responce = _transport->recv();
         if (responce.message_number() == MINISSH_USERAUTH_FAILURE) {
             throw std::runtime_error("wrong password");
         }
@@ -101,7 +101,7 @@ namespace minissh {
 
         LOG_DEBUG("reading tunnel");
         _transport->send(packet{info_message{MINISSH_INTERCEPT_RECV_REQUEST}});
-        packet responce = _safe_recv();
+        packet responce = _transport->recv();
         if (responce.message_number() == MINISSH_INTERCEPT_FAILURE) {
             text_message text_msg = responce.to_struct<text_message>();
             LOG_INFO(text_msg.text);
@@ -133,7 +133,7 @@ namespace minissh {
             mgs.data
         };
         _transport->send(packet{intercept_msg});
-        packet responce = _safe_recv();
+        packet responce = _transport->recv();
         if (responce.message_number() == MINISSH_INTERCEPT_FAILURE) {
             text_message text_msg = responce.to_struct<text_message>();
             LOG_WARN(text_msg.text);
@@ -157,7 +157,7 @@ namespace minissh {
             secret_key
         }});
         {
-            packet responce = _safe_recv();
+            packet responce = _transport->recv();
             if (responce.message_number() == MINISSH_SECRET_FAILURE) {
                 throw std::runtime_error("wrong secret");
             }
@@ -168,7 +168,7 @@ namespace minissh {
 
         _transport->send(packet{info_message{MINISSH_CHANNEL_OPEN}});
         {
-            packet responce = _safe_recv();
+            packet responce = _transport->recv();
             if (responce.message_number() == MINISSH_CHANNEL_OPEN_FAILURE) {
                 throw std::runtime_error("failed to open channel");
             }
@@ -189,7 +189,7 @@ namespace minissh {
             MINISSH_REQUEST,
             service_name
         }});
-        packet responce = _safe_recv();
+        packet responce = _transport->recv();
         if (responce.message_number() == MINISSH_UNIMPLEMENTED) {
             throw std::runtime_error("unimplemented");
         }
@@ -197,24 +197,6 @@ namespace minissh {
             return;
         }
         throw std::runtime_error("request");
-    }
-
-    packet core::_safe_recv() {
-        while (true) {
-            packet recv_packet = _transport->recv();
-            if (recv_packet.message_number() == MINISSH_DEBUG) {
-                text_message text_msg = recv_packet.to_struct<text_message>();
-                LOG_DEBUG(text_msg.text);
-                continue;
-            }
-            if (recv_packet.message_number() == MINISSH_DISCONNECT) {
-                text_message text_msg = recv_packet.to_struct<text_message>();
-                LOG_INFO(std::format("disconnected, reason: \"{}\"", text_msg.text));
-                close();
-                throw std::runtime_error("closed");
-            }
-            return recv_packet;
-        }
     }
 
     void core::_transfer_data() {
