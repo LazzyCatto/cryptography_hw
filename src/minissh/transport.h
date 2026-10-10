@@ -13,7 +13,8 @@ namespace minissh {
             _socket{host, port},
             _client_protocol_name(protocol_name),
             _recv_counter{0},
-            _send_counter{0}
+            _send_counter{0},
+            _first_kex{true}
         {
             _init();
         }
@@ -76,6 +77,9 @@ namespace minissh {
             std::unique_ptr<mac> mac_algorithms_server_to_client = nullptr;
         } _selected_algos;
 
+        secure_buffer _session_id;
+        bool _first_kex;
+
         struct keys {
             secure_buffer encryption_key_client_to_server;
             secure_buffer encryption_key_server_to_client;
@@ -98,8 +102,7 @@ namespace minissh {
         bool _select_mac_server(const keyinit& client, const keyinit& server, std::unique_ptr<mac>*) const;
         bool _select_mac_client(const keyinit& client, const keyinit& server, std::unique_ptr<mac>*) const;
 
-        secure_buffer _get_key(const mpint&, char, const secure_buffer&);
-        secure_buffer _get_mask(const mpint&, char, uint32_t);
+        secure_buffer _get_key(const mpint&, const secure_buffer&, char, const secure_buffer&, uint32_t);
 
         std::string _try_read_string_from_buffer(const uint8_t*, uint32_t) const;
     };

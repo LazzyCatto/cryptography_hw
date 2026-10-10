@@ -30,11 +30,6 @@ namespace minissh {
 
         inline virtual secure_buffer host_key_blob() const { return secure_buffer{}; }
         inline virtual secure_buffer signature_blob() const { return secure_buffer{}; }
-
-        inline virtual secure_buffer encryption_key_client_to_server() const { return secure_buffer{}; }
-        inline virtual secure_buffer encryption_key_server_to_client() const { return secure_buffer{}; }
-        inline virtual secure_buffer integrity_key_client_to_server() const { return secure_buffer{}; }
-        inline virtual secure_buffer integrity_key_server_to_client() const { return secure_buffer{}; }
     };
 }
 
