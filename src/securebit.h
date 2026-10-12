@@ -43,23 +43,6 @@ inline uint8_t subborrow_u64(uint8_t borrow_in, uint64_t a, uint64_t b, uint64_t
 #endif
 }
 
-inline void secure_erase(void* ptr, size_t len) {
-#if defined(_WIN32)
-    SecureZeroMemory(ptr, len);
-#elif defined(__GLIBC__) && (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 25))
-    explicit_bzero(ptr, len);
-#elif defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
-    explicit_bzero(ptr, len);
-#elif defined(__NetBSD__)
-    explicit_memset(ptr, 0, len);
-#elif defined(__APPLE__)
-    memset_s(ptr, len, 0, len);
-#else
-    volatile unsigned char* p = static_cast<volatile unsigned char*>(ptr);
-    while (len--) *p++ = 0;
-#endif
-}
-
 namespace minissh {
     struct secure_buffer {
       public:
@@ -111,7 +94,6 @@ namespace minissh {
 
         void _free(uint8_t* ptr, size_t len) {
             if (ptr) {
-                secure_erase(ptr, len);
                 delete[] ptr;
             }
         }

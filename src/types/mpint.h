@@ -12,6 +12,8 @@ namespace minissh {
     struct mpint_view;
     struct mpint;
 
+    static constexpr uint32_t MPINT_SCHOOLBOOK_THRESHOLD = 20;
+
     bool operator==(mpint_view, mpint_view) noexcept;
     bool operator!=(mpint_view, mpint_view) noexcept;
     bool operator< (mpint_view, mpint_view) noexcept;
@@ -62,6 +64,7 @@ namespace minissh {
         static mpint from_buffer(const secure_buffer& buf) { return mpint{buf}; }
 
         void to_wire(uint8_t*, uint32_t*) const noexcept;
+        uint8_t operator[](uint32_t i) const noexcept;
 
         ~mpint() { _free(_data, _capasity); }
 
@@ -117,7 +120,6 @@ namespace minissh {
         }
         void _free(uint64_t* ptr, uint32_t len) {
             if (ptr) {
-                secure_erase(ptr, len * sizeof(uint64_t));
                 delete[] ptr;
             }
         }
@@ -126,6 +128,7 @@ namespace minissh {
         mpint& _shift_left(uint32_t);
         mpint& _shift_right(uint32_t);
 
+        mpint _schoolbook_mult(mpint_view, mpint_view);
         mpint _karatsuba_mult(const mpint_view&, const mpint_view&);
         static mpint _div_by_limb(mpint_view, uint64_t, uint64_t&);
     };
@@ -189,6 +192,20 @@ namespace minissh {
         0x302B0A6DF25F1437ULL, 0xEF9519B3CD3A431BULL, 0x514A08798E3404DDULL,
         0x020BBEA63B139B22ULL, 0x29024E088A67CC74ULL, 0xC4C6628B80DC1CD1ULL,
         0xC90FDAA22168C234ULL, 0xFFFFFFFFFFFFFFFFULL
+    }};
+
+    inline const mpint_literal<32> MODY_2048_BIT_RABIN{{
+        0x9B2E9DDEFB646E35ULL, 0x38307721FD1023D3ULL, 0x971A1E2CD6CD52F8ULL,
+        0x16FBDB39FCCB30E5ULL, 0xAADB3F4660B3208CULL, 0x3DBD9ABC062B193FULL,
+        0x44265D61B49118F0ULL, 0xF9D9292119E3E756ULL, 0xA716EC3FB1B2C9E0ULL,
+        0x901BF2227EF9FB26ULL, 0x79AB459FDBDFA265ULL, 0xA5C46CD6A3B7F9A2ULL,
+        0x8C8FE7BF66B8BF97ULL, 0x1939B01602D61B55ULL, 0xCC427025977877BDULL,
+        0x4A1B1A180811A346ULL, 0xC58F49CEFEF973F3ULL, 0x48F825D0B354309CULL,
+        0x52FF802D59FC3A9AULL, 0xB6F049521E3466F0ULL, 0x5ABA7DDAE3141E99ULL,
+        0xF2106CC1D74BF57EULL, 0x942E8565DE62AAF1ULL, 0x2DDBA131D5183437ULL,
+        0xB623E47077F3D9D8ULL, 0x9F28247B2577946CULL, 0x61310D1CBE90CC4CULL,
+        0xAF7922C15C2A50D2ULL, 0x2ACA5F16DFCA91A9ULL, 0x9B959835320C125DULL,
+        0x5FBCBDE9E6FA836BULL, 0x98A6A17D710C2212ULL
     }};
 }
 

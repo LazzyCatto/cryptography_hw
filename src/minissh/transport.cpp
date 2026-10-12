@@ -284,6 +284,7 @@ namespace minissh {
             _socket.send_bytes(mac_sign.data(), mac_sign.length());
         }
 
+        LOG_DEBUG("packet is send!");
         ++_send_counter;
     }
 
