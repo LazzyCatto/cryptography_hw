@@ -100,8 +100,13 @@ namespace minissh {
         bool first_bit_flag = (_data[_size - 1] >> (start * 8)) & 0x80;
         *size = (_size - 1) * conv + start + 1 + static_cast<uint32_t>(first_bit_flag);
         
+        if (first_bit_flag) {
+            buf[0] = 0;
+        }
+
         uint8_t carry = 1;
-        for (uint32_t i = 0, j = 0; j < *size; ++j) {
+        uint32_t n = *size - first_bit_flag;
+        for (uint32_t i = 0, j = 0; j < n; ++j) {
             uint64_t buff_data = (_data[i] >> ((j % conv) * 8)) & 0xFF;
             if (_sign) {
                 buff_data = (~buff_data & 0xFF) + carry;
