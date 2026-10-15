@@ -580,6 +580,6 @@ namespace minissh {
             throw std::runtime_error("string too long");
         }
 
-        return std::string(reinterpret_cast<const char*>(buffer), length);
+        return std::string(reinterpret_cast<const char*>(buffer + 4), length);
     }
 }
