@@ -95,6 +95,7 @@ namespace minissh {
         void reserve(uint32_t);
         void resize(uint32_t);
 
+        mpint& sqr();
         static void divmod(mpint_view, mpint_view, mpint&, mpint&);
         static mpint pow_mod(mpint, mpint_view, mpint_view);
         static mpint gcd(mpint_view, mpint_view, mpint&, mpint&);
@@ -130,6 +131,10 @@ namespace minissh {
 
         mpint _schoolbook_mult(mpint_view, mpint_view);
         mpint _karatsuba_mult(const mpint_view&, const mpint_view&);
+
+        mpint _schoolbook_sqr(const mpint_view&);
+        mpint _karatsuba_sqr (const mpint_view&);
+
         static mpint _div_by_limb(mpint_view, uint64_t, uint64_t&);
     };
 

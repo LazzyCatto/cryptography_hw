@@ -1,7 +1,7 @@
 SRCS := $(shell find ./src -name '*.cpp')
 OBJS := $(SRCS:.cpp=.o)
 
-ALL_SRCS := $(find . -name '*.cpp')
+ALL_SRCS := $(shell find . -name '*.cpp')
 ALL_DEPS := $(ALL_SRCS:.cpp=.d)
 
 CXX := g++

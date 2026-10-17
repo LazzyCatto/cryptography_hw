@@ -12,3 +12,6 @@ src/crypto/host_key/*
 
 src/crypto/kex/*
 !kex.h
+
+src/crypto/mac/*
+!mac.h

@@ -1,5 +1,6 @@
 #include "src/types/mpint.h"
 
+#include <cstring>
 #include <stdexcept>
 #include <vector>
 
@@ -463,6 +464,86 @@ namespace minissh {
         return *this;
     }
 
+    mpint mpint::_schoolbook_sqr(const mpint_view& a) {
+        if (a.is_zero()) return mpint{};
+
+        const uint32_t n = a._size;
+
+        mpint r;
+        r.reserve(2 * n);
+        r._size = 2 * n;
+        std::memset(r._data, 0, 2 * n * sizeof(uint64_t));
+
+        for (uint32_t i = 0; i + 1 < n; ++i) {
+            const uint64_t ai = a._data[i];
+            uint64_t carry = 0;
+            for (uint32_t j = i + 1; j < n; ++j) {
+                __uint128_t p = (__uint128_t)ai * a._data[j] + r._data[i + j] + carry;
+                r._data[i + j] = (uint64_t)p;
+                carry          = (uint64_t)(p >> 64);
+            }
+            r._data[i + n] = carry;
+        }
+
+        uint64_t sh = 0;
+        for (uint32_t k = 0; k < 2 * n; ++k) {
+            const uint64_t nx = r._data[k] >> 63;
+            r._data[k] = (r._data[k] << 1) | sh;
+            sh = nx;
+        }
+
+        for (uint32_t i = 0; i < n; ++i) {
+            __uint128_t p = (__uint128_t)a._data[i] * a._data[i];
+            const uint64_t lo = (uint64_t)p;
+            const uint64_t hi = (uint64_t)(p >> 64);
+
+            uint8_t c = 0;
+            c = addcarry_u64(c, r._data[2 * i],     lo, &r._data[2 * i]);
+            c = addcarry_u64(c, r._data[2 * i + 1], hi, &r._data[2 * i + 1]);
+
+            uint32_t k = 2 * i + 2;
+            while (c) {
+                c = addcarry_u64(c, r._data[k], 0, &r._data[k]);
+                ++k;
+            }
+        }
+
+        r._trim();
+        return r;
+    }
+
+    mpint mpint::_karatsuba_sqr(const mpint_view& x) {
+        const uint32_t n = x._size;
+        if (n <= MPINT_SCHOOLBOOK_THRESHOLD) {
+            return _schoolbook_sqr(x);
+        }
+
+        const uint32_t half = (n + 1) / 2;
+
+        mpint_view x0{ half,     x._data,       false };
+        mpint_view x1{ n - half, x._data + half, false };
+
+        mpint z0 = _karatsuba_sqr(x0);
+        mpint z2 = _karatsuba_sqr(x1);
+
+        mpint xsum;
+        xsum.reserve(half + 1);
+        xsum = x0;
+        xsum += x1;
+
+        mpint z3 = _karatsuba_sqr(xsum);
+
+        mpint z1 = std::move(z3);
+        z1 -= z0;
+        z1 -= z2;
+
+        z1 <<= half * 64;
+        z2 <<= 2 * half * 64;
+        z2 += z1;
+        z2 += z0;
+        return z2;
+    }
+
     mpint mpint::_schoolbook_mult(mpint_view a, mpint_view b) {
         if (a.is_zero() || b.is_zero()) return mpint{};
 
@@ -483,7 +564,7 @@ namespace minissh {
                 r._data[i + j] = static_cast<uint64_t>(p);
                 carry          = static_cast<uint64_t>(p >> 64);
             }
-            r._data[i + bn] = carry;   // эта позиция всегда ещё нулевая
+            r._data[i + bn] = carry;
         }
 
         r._trim();
@@ -492,8 +573,9 @@ namespace minissh {
     }
 
     mpint mpint::_karatsuba_mult(const mpint_view& lhs, const mpint_view& rhs) {
-        const uint32_t min_size = std::min(lhs._size, rhs._size);
-        if (min_size <= MPINT_SCHOOLBOOK_THRESHOLD) {
+        if (lhs.is_zero() || rhs.is_zero()) return mpint{};
+        if (lhs._size <= MPINT_SCHOOLBOOK_THRESHOLD ||
+            rhs._size <= MPINT_SCHOOLBOOK_THRESHOLD) {
             return _schoolbook_mult(lhs, rhs);
         }
 
@@ -511,13 +593,15 @@ namespace minissh {
         mpint z2 = _karatsuba_mult(x1, y1);
 
         mpint xsum; xsum.reserve(std::max(x0._size, x1._size) + 1);
-        xsum = x0; xsum += x1;
+        xsum  = x0;
+        xsum += x1;
         mpint ysum; ysum.reserve(std::max(y0._size, y1._size) + 1);
-        ysum = y0; ysum += y1;
+        ysum  = y0;
+        ysum += y1;
 
         mpint z1 = _karatsuba_mult(xsum, ysum);
-        z1 -= z2;
         z1 -= z0;
+        z1 -= z2;
 
         z1 <<= half * 64;
         z2 <<= 2 * half * 64;
@@ -551,11 +635,27 @@ namespace minissh {
                     result %= mod;
                 }
                 if (i + 1 == n && j == top) break;
-                lhs *= lhs;
+                lhs.sqr();
                 lhs %= mod;
             }
         }
         return result;
+    }
+
+    mpint& mpint::sqr() {
+        if (is_zero()) return *this;
+        if (_size == 1) {
+            __uint128_t p = (__uint128_t)_data[0] * _data[0];
+            reserve(2);
+            _data[0] = (uint64_t)p;
+            _data[1] = (uint64_t)(p >> 64);
+            _size = 2;
+            _sign = false;
+            _trim();
+            return *this;
+        }
+        *this = _karatsuba_sqr(*this);
+        return *this;
     }
 
     mpint mpint::gcd(mpint_view lhs, mpint_view rhs, mpint& a, mpint& b) {
