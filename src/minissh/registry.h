@@ -8,6 +8,7 @@
 #include "src/crypto/cipher/cipher.h"
 #include "src/crypto/host_key/host_key.h"
 #include "src/crypto/kex/kex.h"
+#include "src/crypto/kex/server_kex.h"
 #include "src/crypto/mac/mac.h"
 #include "src/logger.h"
 
@@ -53,6 +54,10 @@ namespace minissh {
         static registry<kex> reg;
         return reg;
     }
+    inline registry<server_kex>& server_kex_registry() {
+        static registry<server_kex> reg;
+        return reg;
+    }
     inline registry<host_key>& host_key_registry() {
         static registry<host_key> reg;
         return reg;
@@ -85,6 +90,13 @@ namespace minissh {
 #define REGISTRAR_KEX(name, cls)\
     static minissh::registrar<minissh::kex> regisrar_##cls{ \
         minissh::kex_registry(), \
+        name, \
+        [](){ return std::make_unique<cls>(); } \
+    };
+
+#define REGISTRAR_SERVER_KEX(name, cls)\
+    static minissh::registrar<minissh::kex> regisrar_##cls{ \
+        minissh::server_kex_registry(), \
         name, \
         [](){ return std::make_unique<cls>(); } \
     };
