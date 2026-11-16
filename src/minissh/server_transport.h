@@ -61,7 +61,6 @@ namespace minissh {
 
         struct algorythms {
             std::unique_ptr<server_kex> kex_algorithms = nullptr;
-            std::unique_ptr<server_host_key> server_host_key_algorithms = nullptr;
             std::unique_ptr<cipher> encryption_algorithms_client_to_server = nullptr;
             std::unique_ptr<cipher> encryption_algorithms_server_to_client = nullptr;
             std::unique_ptr<mac> mac_algorithms_client_to_server = nullptr;
