@@ -45,9 +45,6 @@ namespace minissh {
         uint32_t recv_counter() const { return _recv_counter; }
         uint32_t send_counter() const { return _send_counter; }
 
-        template <typename T>
-        T& get_socket() { return dynamic_cast<T&>(*_socket); }
-
       private:
         bool _closed;
 
